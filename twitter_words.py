@@ -5,7 +5,7 @@ import tweepy
 import re
 import json
 import nltk
-
+import wordcloud
 import collections
 import prettytable
 
@@ -55,12 +55,39 @@ class TweetWords(object):
 
         return pad_to + 1
 
-    # returns sorted list of key value tuples, accepts counter object
     @staticmethod
     def get_sorted_items(item_counter, reverse_sort=True):
         return sorted(item_counter.items(), key=lambda pair: pair[1], reverse=reverse_sort)
 
-    # prints a formatted list of tuples
+    # trying out filtering using sort to get top words and then back to counter object so word cloud can use
+    def get_filtered_words(self):
+        filtered = collections.Counter()
+        if self.words:
+            for item in self.words:
+                attr = item
+                value = self.words[item]
+                if len(attr) >= self.min_word_length and value >= self.min_word_frequency and attr not in wordcloud.STOPWORDS:
+                    filtered[attr] = value
+
+        # gets a sorted list of tuples
+        filtered_sort = self.get_sorted_items(filtered)
+
+        final_list = collections.Counter()
+        i = 0
+        for item in filtered_sort:
+            attr, value = item
+
+            if self.display_top == 0:
+                final_list[attr] = value
+            else:
+                if i < self.display_top:
+                    final_list[attr] = value
+                    i += 1
+                else:
+                    break
+
+        return final_list
+
     def print_items(self, list_items, words=False):
 
         if not list_items:
@@ -120,7 +147,7 @@ class TweetWords(object):
                 if not word:
                     continue
 
-                # hashtags and mentions
+                # hashtags and mentions else words
                 if word[0] == "#" and len(word)>1:
                     self.hashtags[word] += 1
                 elif self.is_screen_name(word):
@@ -131,7 +158,6 @@ class TweetWords(object):
 
             i += 1
 
-# accepts numeric id or twitter screen name (@name)
 def valid_twitter_user(user_id):
     user_id = str(user_id)
 
@@ -190,6 +216,20 @@ def get_arguments():
     args = parser.parse_args()
 
     return args
+
+def create_wordcloud(words):
+
+    current_directory = os.path.dirname(__file__)
+
+    word_cloud = wordcloud.WordCloud(
+        background_color='white',
+        width=1280,
+        height=800,
+        stopwords=None)
+
+    word_cloud.generate_from_frequencies(words)
+
+    word_cloud.to_file(os.path.join(current_directory, 'wordcloud.png'))
 
 def main():
     twitter_api_keys = get_twitter_env_api_keys();
@@ -269,6 +309,8 @@ def main():
     if tweet_words.words:
         print("WORDS")
         tweet_words.print_items(tweet_words.get_sorted_items(tweet_words.words), True)
+
+        create_wordcloud(tweet_words.get_filtered_words())
 
     if tweet_words.retweets:
         print("\nRETWEETED")
