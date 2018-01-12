@@ -114,7 +114,7 @@ class TweetWords(object):
 
             if not self.WORD_HTTP_PATTERN.match(word):
                 # not sure about this - doesnt start with alpha,@,# or doesn't end with alpha
-                # removes parenthesis and quotes etc - aggressive / nltk handles now
+                # removes parenthesis and quotes etc - aggressive / nltk handles now mostly
                 word = self.WORD_STRIP_SPECIAL_PATTERN.sub('', word)
 
                 if not word:
@@ -161,6 +161,24 @@ def print_json(json_block, sort=True, indents=4):
 
     return None
 
+def get_twitter_env_api_keys(consumer_key='TWITTER_CONSUMER_KEY', consumer_secret='TWITTER_CONSUMER_SECRET',
+                            access_key='TWITTER_ACCESS_KEY', access_secret='TWITTER_ACCESS_SECRET'):
+
+    api_keys = {}
+    api_keys['consumer_key'] = os.environ.get(consumer_key, 'None')
+    api_keys['consumer_secret'] = os.environ.get(consumer_secret, 'None')
+    api_keys['access_key'] = os.environ.get(access_key, 'None')
+    api_keys['access_secret'] = os.environ.get(access_secret, 'None')
+
+    env_missing = False
+    for item in api_keys:
+        if api_keys[item] is 'None':
+            env_missing = True
+    if env_missing:
+        print("warning: twitter api env variables missing.")
+
+    return api_keys
+
 def get_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('-u', '--user', help="twitter user @name", type=valid_twitter_user, required=True)
@@ -174,13 +192,9 @@ def get_arguments():
     return args
 
 def main():
-    CONSUMER_KEY = os.environ.get('TWITTER_CONSUMER_KEY', 'None')
-    CONSUMER_SECRET = os.environ.get('TWITTER_CONSUMER_SECRET', 'None')
-    ACCESS_KEY = os.environ.get('TWITTER_ACCESS_KEY', 'None')
-    ACCESS_SECRET = os.environ.get('TWITTER_ACCESS_SECRET', 'None')
-
-    auth = tweepy.OAuthHandler(CONSUMER_KEY, CONSUMER_SECRET)
-    auth.set_access_token(ACCESS_KEY, ACCESS_SECRET)
+    twitter_api_keys = get_twitter_env_api_keys();
+    auth = tweepy.OAuthHandler(twitter_api_keys['consumer_key'], twitter_api_keys['consumer_secret'])
+    auth.set_access_token(twitter_api_keys['access_key'], twitter_api_keys['access_secret'])
 
     api = tweepy.API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True, compression=True)
 
@@ -203,7 +217,7 @@ def main():
                 tweet = next(timeline_statuses)
             except tweepy.TweepError as err:
                 print(err)
-                continue
+                break
             except StopIteration:
                 break
 
@@ -229,7 +243,7 @@ def main():
 
             tweet_text = tweet_text.replace("&amp;", "&")
 
-            # magic part
+            # do all the word things
             tweet_words.count_words(tweet_text)
 
             tweet_reply_name = ""
@@ -252,16 +266,26 @@ def main():
         print(tweets_table)
         print()
 
-    print("WORDS")
-    tweet_words.print_items(tweet_words.get_sorted_items(tweet_words.words), True)
-    print("\nRETWEETED")
-    tweet_words.print_items(tweet_words.get_sorted_items(tweet_words.retweets), False)
-    print("\nREPLIES")
-    tweet_words.print_items(tweet_words.get_sorted_items(tweet_words.replies), False)
-    print("\nMENTIONS")
-    tweet_words.print_items(tweet_words.get_sorted_items(tweet_words.mentions), False)
-    print("\nHASHTAGS")
-    tweet_words.print_items(tweet_words.get_sorted_items(tweet_words.hashtags), False)
+    if tweet_words.words:
+        print("WORDS")
+        tweet_words.print_items(tweet_words.get_sorted_items(tweet_words.words), True)
+
+    if tweet_words.retweets:
+        print("\nRETWEETED")
+        tweet_words.print_items(tweet_words.get_sorted_items(tweet_words.retweets), False)
+
+    if tweet_words.replies:
+        print("\nREPLIES")
+        tweet_words.print_items(tweet_words.get_sorted_items(tweet_words.replies), False)
+
+    if tweet_words.mentions:
+        print("\nMENTIONS")
+        tweet_words.print_items(tweet_words.get_sorted_items(tweet_words.mentions), False)
+
+    if tweet_words.hashtags:
+        print("\nHASHTAGS")
+        tweet_words.print_items(tweet_words.get_sorted_items(tweet_words.hashtags), False)
+
     # print("\nMEDIA")
     # tweet_words.print_items(tweet_words.media, False)
     # print("\nURLS")
