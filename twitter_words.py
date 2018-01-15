@@ -5,16 +5,17 @@ import tweepy
 import re
 import json
 import nltk
-
+import wordcloud
 import collections
 import prettytable
+import textblob
+import numpy
+import PIL
+import matplotlib
 
-class TweetWords(object):
-    SCREEN_NAME_PATTERN = re.compile(r'^@\w{1,15}$', re.UNICODE)
-    RETWEET_PATTERN = re.compile(r'^RT\s(@.*?):\s(.*)', re.UNICODE|re.DOTALL)
-    WORD_HTTP_PATTERN = re.compile('^https?://', re.UNICODE)
-    WORD_STRIP_SPECIAL_PATTERN = re.compile(r'^[^\w@#]+|\W+$', re.UNICODE)
+import twitter_helper
 
+class TweetWords(twitter_helper.TwitterHelper):
     def __init__(self, min_word_length, min_word_frequency, display_top):
         self.words = collections.Counter()
         self.min_word_length = min_word_length
@@ -31,12 +32,6 @@ class TweetWords(object):
         self.urls = collections.Counter()
 
         self.tweet_tokenizer = nltk.tokenize.TweetTokenizer()
-
-    @classmethod
-    def is_screen_name(cls, word):
-        if cls.SCREEN_NAME_PATTERN.match(word):
-            return True
-        return False
 
     @staticmethod
     def _get_attr_padding(list_items):
@@ -55,14 +50,43 @@ class TweetWords(object):
 
         return pad_to + 1
 
-    # returns sorted list of key value tuples, accepts counter object
     @staticmethod
     def get_sorted_items(item_counter, reverse_sort=True):
         return sorted(item_counter.items(), key=lambda pair: pair[1], reverse=reverse_sort)
 
-    # prints a formatted list of tuples
-    def print_items(self, list_items, words=False):
+    # trying out filtering using sort to get top words and then back to counter object so
+    # word cloud can use
+    def get_filtered_words(self):
+        filtered = collections.Counter()
+        if self.words:
+            for item in self.words:
+                attr = item
+                value = self.words[item]
+                if len(attr) >= self.min_word_length and value >= self.min_word_frequency \
+                    and attr not in wordcloud.STOPWORDS:
 
+                    filtered[attr] = value
+
+        # gets a sorted list of tuples
+        filtered_sort = self.get_sorted_items(filtered)
+
+        final_list = collections.Counter()
+        i = 0
+        for item in filtered_sort:
+            attr, value = item
+
+            if self.display_top == 0:
+                final_list[attr] = value
+            else:
+                if i < self.display_top:
+                    final_list[attr] = value
+                    i += 1
+                else:
+                    break
+
+        return final_list
+
+    def print_items(self, list_items, words=False):
         if not list_items:
             print("none.")
         else:
@@ -115,99 +139,92 @@ class TweetWords(object):
             if not self.WORD_HTTP_PATTERN.match(word):
                 # not sure about this - doesnt start with alpha,@,# or doesn't end with alpha
                 # removes parenthesis and quotes etc - aggressive / nltk handles now mostly
-                word = self.WORD_STRIP_SPECIAL_PATTERN.sub('', word)
+                # word = self.WORD_STRIP_SPECIAL_PATTERN.sub('', word)
+                #
+                # if not word:
+                #     continue
 
-                if not word:
-                    continue
-
-                # hashtags and mentions
+                # hashtags and mentions else words
                 if word[0] == "#" and len(word)>1:
                     self.hashtags[word] += 1
                 elif self.is_screen_name(word):
                     if i != 0:
                         self.mentions[word] += 1
                 else:
-                    self.words[word] += 1
+                    if word not in wordcloud.STOPWORDS:
+                        self.words[word] += 1
 
             i += 1
 
-# accepts numeric id or twitter screen name (@name)
-def valid_twitter_user(user_id):
-    user_id = str(user_id)
-
-    user_id_match = re.match(r'^@(\w{1,15})$', user_id)
-
-    if user_id_match or user_id.isdigit():
-        return user_id
-    else:
-        msg = "must start with @, be alphanumeric and < 16 characters or be a numeric id."
-        raise argparse.ArgumentTypeError(msg)
-
-def insert_newlines(input_string, line_length):
-    lines = []
-    for i in range(0, len(input_string), line_length):
-        lines.append(input_string[i:i+line_length])
-
-    output_string = '\n'.join(lines)
-    output_string = re.sub(r'\r?\n\s', r'\n', output_string, re.DOTALL|re.UNICODE)
-
-    return output_string
-
-def print_json(json_block, sort=True, indents=4):
-    if type(json_block) is str:
-        print(json.dumps(json.loads(json_block), sort_keys=sort, indent=indents))
-    else:
-        print(json.dumps(json_block, sort_keys=sort, indent=indents))
-
-    return None
-
-def get_twitter_env_api_keys(consumer_key='TWITTER_CONSUMER_KEY', consumer_secret='TWITTER_CONSUMER_SECRET',
-                            access_key='TWITTER_ACCESS_KEY', access_secret='TWITTER_ACCESS_SECRET'):
-
-    api_keys = {}
-    api_keys['consumer_key'] = os.environ.get(consumer_key, 'None')
-    api_keys['consumer_secret'] = os.environ.get(consumer_secret, 'None')
-    api_keys['access_key'] = os.environ.get(access_key, 'None')
-    api_keys['access_secret'] = os.environ.get(access_secret, 'None')
-
-    env_missing = False
-    for item in api_keys:
-        if api_keys[item] is 'None':
-            env_missing = True
-    if env_missing:
-        print("warning: twitter api env variables missing.")
-
-    return api_keys
+# def insert_newlines(input_string, line_length):
+#     lines = []
+#     for i in range(0, len(input_string), line_length):
+#         lines.append(input_string[i:i+line_length])
+#
+#     output_string = '\n'.join(lines)
+#     output_string = re.sub(r'\r?\n\s', r'\n', output_string, re.DOTALL|re.UNICODE)
+#
+#     return output_string
 
 def get_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-u', '--user', help="twitter user @name", type=valid_twitter_user, required=True)
+    parser.add_argument('-u', '--user', help="twitter user @name", type=twitter_helper.TwitterHelper.arg_twitter_id, required=True)
     parser.add_argument('-c', '--count', help="get count number of tweets", type=int, default=1)
+    parser.add_argument('-rt', '--retweets', help="include retweets ", required=False, default=False, action='store_true')
     parser.add_argument('-s', '--show', help="show count tweets ", required=False, default=False, action='store_true')
     parser.add_argument('-l', '--min_length', help="min word length", type=int, default=1)
     parser.add_argument('-f', '--min_freq', help="min word frequency", type=int, default=1)
     parser.add_argument('-t', '--top', help="display top number of words by freq", type=int, default=0)
+    parser.add_argument('-wc', '--wordcloud', help="create word cloud", required=False, default=False, action='store_true')
     args = parser.parse_args()
 
     return args
 
-def main():
-    twitter_api_keys = get_twitter_env_api_keys();
-    auth = tweepy.OAuthHandler(twitter_api_keys['consumer_key'], twitter_api_keys['consumer_secret'])
-    auth.set_access_token(twitter_api_keys['access_key'], twitter_api_keys['access_secret'])
+def create_wordcloud(words):
+    current_directory = os.path.dirname(__file__)
 
-    api = tweepy.API(auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True, compression=True)
+    #flower_mask = numpy.array(PIL.Image.open(os.path.join(current_directory, "flower_mask.png")))
+
+    stopwords = set(wordcloud.STOPWORDS)
+
+    word_cloud = wordcloud.WordCloud(
+        background_color='white',
+        width=1280,
+        height=800,
+        #mask=flower_mask,
+        stopwords=stopwords)
+
+    word_cloud.generate_from_frequencies(words)
+
+    word_cloud.to_file(os.path.join(current_directory, 'wordcloud.png'))
+
+    # matplotlib.pyplot.imshow(word_cloud, interpolation='bilinear')
+    # matplotlib.pyplot.axis("off")
+    # matplotlib.pyplot.figure()
+    # matplotlib.pyplot.imshow(flower_mask, cmap=matplotlib.pyplot.cm.gray, interpolation='bilinear')
+    # matplotlib.pyplot.axis("off")
+    # matplotlib.pyplot.show()
+
+def main():
+    twitter_api_keys = twitter_helper.get_twitter_env_api_keys()
+    tweepy_auth = twitter_helper.get_tweepy_auth_handler(twitter_api_keys)
+
+    api = tweepy.API(tweepy_auth, wait_on_rate_limit=True, wait_on_rate_limit_notify=True, compression=True)
 
     user_args = get_arguments()
 
-    tweet_words = TweetWords(min_word_length=user_args.min_length, min_word_frequency=user_args.min_freq, \
-                                display_top=user_args.top)
+    # print(f"type: {type(user_args)} - {user_args}")
+    # sys.exit()
+
+    tweet_words = TweetWords(min_word_length=user_args.min_length, min_word_frequency=user_args.min_freq,
+                             display_top=user_args.top)
 
     try:
-        timeline_statuses = tweepy.Cursor(api.user_timeline, screen_name=user_args.user, count=user_args.count, \
-                                include_rts=True, cursor=-1, tweet_mode='extended').items(user_args.count)
+        timeline_statuses = tweepy.Cursor(api.user_timeline, screen_name=user_args.user, count=user_args.count,
+                                          include_rts=user_args.retweets, cursor=-1,
+                                          tweet_mode='extended').items(user_args.count)
 
-        tweets_table = prettytable.PrettyTable(['', 'Created', 'Reply', 'RT', 'Text'])
+        tweets_table = prettytable.PrettyTable(['', 'Created', 'Reply', 'RT', 'Text', 'Sentiment'])
         tweets_table.align = "l"
         tweets_table.hrules = True
 
@@ -221,15 +238,24 @@ def main():
             except StopIteration:
                 break
 
-            tweet_counter += 1;
+            tweet_counter += 1
+
+            # if tweet_counter == 54:
+            #     print_json(tweet._json)
+
+            # extra_info = ""
 
             tweet_created = tweet.created_at
 
             tweet_text = ""
             if hasattr(tweet, 'full_text'):
                 tweet_text = tweet.full_text
+                # extra_info += "tweet.full_text, "
             else:
                 tweet_text = tweet.text
+                # extra_info += "tweet.text, "
+
+            #tweet_text = tweet.text
 
             if hasattr(tweet, 'entities'):
                 if 'urls' in tweet.entities:
@@ -237,6 +263,12 @@ def main():
                         tweet_words.urls[u.get('expanded_url')] += 1
 
             if hasattr(tweet, 'extended_entities'):
+                # if tweet.truncated:
+                #     extra_info += "tweet.truncated, "
+                #     if 'full_text' in tweet.extended_entities:
+                #         tweet_text = tweet.extended_entities['full_text']
+                #         extra_info += "tweet.extended_entities[full_text]"
+
                 if 'media' in tweet.extended_entities:
                     for m in tweet.extended_entities['media']:
                         tweet_words.media[m.get('media_url_https')] += 1
@@ -254,10 +286,15 @@ def main():
             retweet_name = ""
             retweet_match = tweet_words.RETWEET_PATTERN.match(tweet_text)
             if retweet_match:
-                 retweet_name = retweet_match.group(1)
+                retweet_name = retweet_match.group(1)
 
-            tweet_text = insert_newlines(tweet_text, 80)
-            tweets_table.add_row([tweet_counter, tweet_created, tweet_reply_name, retweet_name, tweet_text])
+            feelings = textblob.TextBlob(tweet_text)
+            sentiment = f"pol:{feelings.sentiment[0]:.2f}\nsub:{feelings.sentiment[1]:.2f}"
+
+            # tweet_text += "[" + extra_info + "]"
+
+            tweet_text = twitter_helper.insert_newlines(tweet_text, 65, 0, False, False)
+            tweets_table.add_row([tweet_counter, tweet_created, tweet_reply_name, retweet_name, tweet_text, sentiment])
     except tweepy.TweepError as err:
         print(f"error: {err}")
 
@@ -270,18 +307,18 @@ def main():
         print("WORDS")
         tweet_words.print_items(tweet_words.get_sorted_items(tweet_words.words), True)
 
-    if tweet_words.retweets:
-        print("\nRETWEETED")
-        tweet_words.print_items(tweet_words.get_sorted_items(tweet_words.retweets), False)
-
-    if tweet_words.replies:
-        print("\nREPLIES")
-        tweet_words.print_items(tweet_words.get_sorted_items(tweet_words.replies), False)
-
-    if tweet_words.mentions:
-        print("\nMENTIONS")
-        tweet_words.print_items(tweet_words.get_sorted_items(tweet_words.mentions), False)
-
+    # if tweet_words.retweets:
+    #     print("\nRETWEETED")
+    #     tweet_words.print_items(tweet_words.get_sorted_items(tweet_words.retweets), False)
+    #
+    # if tweet_words.replies:
+    #     print("\nREPLIES")
+    #     tweet_words.print_items(tweet_words.get_sorted_items(tweet_words.replies), False)
+    #
+    # if tweet_words.mentions:
+    #     print("\nMENTIONS")
+    #     tweet_words.print_items(tweet_words.get_sorted_items(tweet_words.mentions), False)
+    #
     if tweet_words.hashtags:
         print("\nHASHTAGS")
         tweet_words.print_items(tweet_words.get_sorted_items(tweet_words.hashtags), False)
@@ -290,6 +327,9 @@ def main():
     # tweet_words.print_items(tweet_words.media, False)
     # print("\nURLS")
     # tweet_words.print_items(tweet_words.urls, False)
+
+    if user_args.wordcloud:
+        create_wordcloud(tweet_words.get_filtered_words())
 
 if __name__ == '__main__':
     main()
