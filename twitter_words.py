@@ -132,7 +132,7 @@ class TweetWords(twitter_helper.TwitterHelper):
         for word in word_array:
             word = word.lower().strip()
 
-            # don't count empty strings returned by split
+            # don't count empty strings
             if not word:
                 continue
 
@@ -156,16 +156,6 @@ class TweetWords(twitter_helper.TwitterHelper):
 
             i += 1
 
-# def insert_newlines(input_string, line_length):
-#     lines = []
-#     for i in range(0, len(input_string), line_length):
-#         lines.append(input_string[i:i+line_length])
-#
-#     output_string = '\n'.join(lines)
-#     output_string = re.sub(r'\r?\n\s', r'\n', output_string, re.DOTALL|re.UNICODE)
-#
-#     return output_string
-
 def get_arguments():
     parser = argparse.ArgumentParser()
     parser.add_argument('-u', '--user', help="twitter user @name", type=twitter_helper.TwitterHelper.arg_twitter_id, required=True)
@@ -183,27 +173,16 @@ def get_arguments():
 def create_wordcloud(words):
     current_directory = os.path.dirname(__file__)
 
-    #flower_mask = numpy.array(PIL.Image.open(os.path.join(current_directory, "flower_mask.png")))
-
     stopwords = set(wordcloud.STOPWORDS)
 
     word_cloud = wordcloud.WordCloud(
         background_color='white',
         width=1280,
         height=800,
-        #mask=flower_mask,
         stopwords=stopwords)
 
     word_cloud.generate_from_frequencies(words)
-
     word_cloud.to_file(os.path.join(current_directory, 'wordcloud.png'))
-
-    # matplotlib.pyplot.imshow(word_cloud, interpolation='bilinear')
-    # matplotlib.pyplot.axis("off")
-    # matplotlib.pyplot.figure()
-    # matplotlib.pyplot.imshow(flower_mask, cmap=matplotlib.pyplot.cm.gray, interpolation='bilinear')
-    # matplotlib.pyplot.axis("off")
-    # matplotlib.pyplot.show()
 
 def main():
     twitter_api_keys = twitter_helper.get_twitter_env_api_keys()
@@ -240,22 +219,15 @@ def main():
 
             tweet_counter += 1
 
-            # if tweet_counter == 54:
-            #     print_json(tweet._json)
-
-            # extra_info = ""
-
             tweet_created = tweet.created_at
 
             tweet_text = ""
             if hasattr(tweet, 'full_text'):
                 tweet_text = tweet.full_text
-                # extra_info += "tweet.full_text, "
             else:
                 tweet_text = tweet.text
-                # extra_info += "tweet.text, "
 
-            #tweet_text = tweet.text
+            tweet_text = tweet_text.replace("&amp;", "&")
 
             if hasattr(tweet, 'entities'):
                 if 'urls' in tweet.entities:
@@ -263,17 +235,9 @@ def main():
                         tweet_words.urls[u.get('expanded_url')] += 1
 
             if hasattr(tweet, 'extended_entities'):
-                # if tweet.truncated:
-                #     extra_info += "tweet.truncated, "
-                #     if 'full_text' in tweet.extended_entities:
-                #         tweet_text = tweet.extended_entities['full_text']
-                #         extra_info += "tweet.extended_entities[full_text]"
-
                 if 'media' in tweet.extended_entities:
                     for m in tweet.extended_entities['media']:
                         tweet_words.media[m.get('media_url_https')] += 1
-
-            tweet_text = tweet_text.replace("&amp;", "&")
 
             # do all the word things
             tweet_words.count_words(tweet_text)
@@ -291,9 +255,7 @@ def main():
             feelings = textblob.TextBlob(tweet_text)
             sentiment = f"pol:{feelings.sentiment[0]:.2f}\nsub:{feelings.sentiment[1]:.2f}"
 
-            # tweet_text += "[" + extra_info + "]"
-
-            tweet_text = twitter_helper.insert_newlines(tweet_text, 65, 0, False, False)
+            tweet_text = twitter_helper.insert_newlines(tweet_text, 65)
             tweets_table.add_row([tweet_counter, tweet_created, tweet_reply_name, retweet_name, tweet_text, sentiment])
     except tweepy.TweepError as err:
         print(f"error: {err}")

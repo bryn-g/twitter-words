@@ -58,15 +58,29 @@ def print_json(json_block, sort=True, indents=4):
 
     return None
 
-def insert_newlines(input_string, line_length, padding_count=0, padding_first_line=True, newline_to_spaces=True):
-    if newline_to_spaces:
-        input_string = re.sub('\r?\n', ' ', input_string)
-
+def cut_lines(input_string, line_length):
     lines = []
     for i in range(0, len(input_string), line_length):
         lines.append(input_string[i:i+line_length])
 
-    output_string = '\n'.join(lines)
+    return lines
+
+def insert_newlines(input_text, line_length, padding_count=0, padding_first_line=False, newline_to_spaces=False):
+    output_string = ""
+    if type(input_text) is list:
+        for line in input_text:
+            output_string += '\n'
+            output_string += '\n'.join(cut_lines(line, line_length))
+
+    elif type(input_string) is str:
+        input_string = input_text
+
+        if newline_to_spaces:
+            input_string = re.sub('\r?\n', ' ', input_string)
+
+        output_string = '\n'.join(cut_lines(input_string, line_length))
+    else:
+        return ""
 
     if padding_count > 0:
         spaces = " "*padding_count
