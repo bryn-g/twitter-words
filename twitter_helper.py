@@ -6,6 +6,7 @@ import tweepy
 
 class TwitterHelper(object):
     SCREEN_NAME_PATTERN = re.compile(r'^@?[A-Za-z0-9_]{1,15}$', re.UNICODE)
+    TWEET_SCREEN_NAME_PATTERN = re.compile(r'(@[A-Za-z0-9_]{1,15})', re.DOTALL)
     RETWEET_PATTERN = re.compile(r'^RT\s(@.*?):\s(.*)', re.UNICODE|re.DOTALL)
     WORD_HTTP_PATTERN = re.compile('^https?://', re.UNICODE)
     WORD_STRIP_SPECIAL_PATTERN = re.compile(r'^[^\w@#]+|\W+$', re.UNICODE)

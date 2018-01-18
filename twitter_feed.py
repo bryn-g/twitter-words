@@ -11,14 +11,16 @@ import twitter_helper
 import text_colorizer
 
 class FeedListener(tweepy.streaming.StreamListener):
-    stop_count = 10
-    tweet_count = 0
+    #stop_count = 10
+    #tweet_count = 0
 
     term = text_colorizer.TermTextColorizer()
     term.add_iro("orange", "172")
+    term.add_iro("lorange", "220")
     term.add_iro("lgreen", "112")
     term.add_iro("lviolet", "140")
     term.add_iro("dull", "246")
+    term.add_iro("bland", "96")
 
     @classmethod
     def handle_urls(cls, urls, text, count, tag="URL"):
@@ -42,7 +44,7 @@ class FeedListener(tweepy.streaming.StreamListener):
             if status.retweeted_status:
                 return
 
-        self.tweet_count += 1
+        #self.tweet_count += 1
 
         text = ""
         if hasattr(status, 'extended_tweet') and status.truncated:
@@ -60,6 +62,9 @@ class FeedListener(tweepy.streaming.StreamListener):
                     tweet_url_list += url_list
 
                 if 'hashtags' in status.extended_tweet['entities']:
+                    if len(status.extended_tweet['entities']['hashtags']) > 6:
+                        return
+
                     for hashtag in status.extended_tweet['entities']['hashtags']:
                         tag = f"#{hashtag['text']}"
                         color_tag = f"{self.term.iro(tag, 'orange')}"
@@ -71,6 +76,9 @@ class FeedListener(tweepy.streaming.StreamListener):
                 tweet_url_list += url_list
 
             if 'hashtags' in status.entities:
+                if len(status.entities['hashtags']) > 6:
+                    return
+
                 for hashtag in status.entities['hashtags']:
                     tag = f"#{hashtag['text']}"
                     color_tag = f"{self.term.iro(tag, 'orange')}"
@@ -85,6 +93,11 @@ class FeedListener(tweepy.streaming.StreamListener):
         nl = self.term.iro(' • ', 'dull')
         text = re.sub('[\n]{1,}', nl, text)
 
+        #r'(@[A-Za-z0-9_]{1,15})\W'
+        text = re.sub(twitter_helper.TwitterHelper.TWEET_SCREEN_NAME_PATTERN, self.term.iro(r'\1', 'lorange'), text)
+        #text = twitter_helper.TwitterHelper.TWEET_SCREEN_NAME_PATTERN.sub(text)
+
+
         quote_status = ""
         if hasattr(status, 'is_quote_status'):
             if status.is_quote_status:
@@ -95,7 +108,8 @@ class FeedListener(tweepy.streaming.StreamListener):
             if 'entities' in status.quoted_status:
                 if 'user_mentions' in status.quoted_status['entities']:
                     for user in status.quoted_status['entities']['user_mentions']:
-                        quote_mentions += f" @{user['screen_name']}"
+                        #quote_mentions += f" @{user['screen_name']}"
+                        quote_mentions += f" {self.term.iro('@' + user['screen_name'], 'bland')}"
 
         header_string = f"[{self.term.iro(status.created_at, 'lgreen')}]" + \
                         f"[{self.term.iro('@' + status.user.screen_name, 'lviolet')}] {quote_status}{quote_mentions}"
@@ -103,9 +117,10 @@ class FeedListener(tweepy.streaming.StreamListener):
         tweet_string = f"{text}"
         tweet_string = f"{textwrap.dedent(tweet_string).strip()}"
 
-        padding = ' '*21
-        width = len(padding) + 90
-        print(f"{textwrap.fill(header_string, width=width, subsequent_indent=padding)}")
+        padding_length = 21
+        padding = ' '*padding_length
+        width = padding_length + 90
+        print(f"{textwrap.fill(header_string, width=width+padding_length, subsequent_indent=padding)}")
         print(f"{textwrap.fill(tweet_string, width=width, initial_indent=padding, subsequent_indent=padding)}")
 
         if tweet_url_list:
@@ -116,13 +131,17 @@ class FeedListener(tweepy.streaming.StreamListener):
             print(f"{color_urls}")
 
         print()
+
         #twitter_helper.print_json(status._json)
+        # if self.tweet_count == self.stop_count:
+        #     exit()
 
-        if self.tweet_count == self.stop_count:
-            exit()
+    def on_error(self, status):
+        if status == 420:
+            print(f"Stream is limited.")
+        else:
+            print(f"Stream error: {status}")
 
-    def on_error(self, status_code):
-        print(f"error: {status_code}")
         return False
 
 def get_arguments():
@@ -140,7 +159,23 @@ def main():
     keyword_list = user_args.keyword.split(',')
 
     twitter_stream = tweepy.Stream(tweepy_auth, FeedListener())
-    twitter_stream.filter(track=keyword_list)
+    twitter_stream.filter(track=keyword_list, async=True)
+
+    key_press = ''
+    while key_press != 'q':
+        try:
+            key_press = input("Twitter Feed is running. (Enter 'q' to quit)\n")
+        except SyntaxError:
+            pass
+        except:
+            twitter_stream.disconnect()
+            system.exit()
+
+    print(f"Stopping Twitter Feed.")
+    try:
+        twitter_stream.disconnect()
+    except:
+        print(f"Stream disconnect error.")
 
 if __name__ == '__main__':
     main()
