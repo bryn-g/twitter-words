@@ -152,6 +152,9 @@ def get_arguments():
     return args
 
 def main():
+    term = text_colorizer.TermTextColorizer()
+    term.add_iro("lblue", "38")
+
     twitter_api_keys = twitter_helper.get_twitter_env_api_keys()
     tweepy_auth = twitter_helper.get_tweepy_auth_handler(twitter_api_keys)
 
@@ -164,18 +167,19 @@ def main():
     key_press = ''
     while key_press != 'q':
         try:
-            key_press = input("Twitter Feed is running. (Enter 'q' to quit)\n")
+            key_press = input(f"{term.iro('Twitter feed is running. (enter q or ctrl-c to quit)', 'lblue')}\n")
         except SyntaxError:
             pass
         except:
+            print(f"\n{term.iro('Stopping twitter feed.', 'lblue')}")
             twitter_stream.disconnect()
-            system.exit()
+            sys.exit()
 
-    print(f"Stopping Twitter Feed.")
+    print(f"{term.iro('Stopping twitter feed.', 'lblue')}")
     try:
         twitter_stream.disconnect()
     except:
-        print(f"Stream disconnect error.")
+        print(f"{term.iro('Stream disconnect error.', 'lblue')}")
 
 if __name__ == '__main__':
     main()
