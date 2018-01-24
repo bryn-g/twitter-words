@@ -1,7 +1,9 @@
 import os
 import sys
 import re
+import click
 
+# iro is japanese romanji for color - saves text colors
 class IroList:
     def __init__(self):
         self._iro_list = {}
@@ -23,6 +25,7 @@ class IroList:
     def remove_iro(self, name):
         if name in self._iro_list:
             del self._iro_list[name]
+            self.remove_iro_method(name)
 
     def iro(self, text, name=""):
         if name is "":
@@ -34,6 +37,20 @@ class IroList:
             return f"{pre_code}{text}{post_code}"
 
         return text
+
+    def make_iro_method(self, name, text):
+        def _method(text):
+            self.set_iro = name
+            return f"{self.iro(text, name)}"
+
+        return _method
+
+    def add_iro_method(self, name):
+        _method = self.make_iro_method(name, "text")
+        setattr(self, name, _method)
+
+    def remove_iro_method(self, name):
+        delattr(self, name)
 
 class TermTextColorizer(IroList):
     # format: "\033[{text_code};5;{256_code}m{text}\033[0m"
@@ -79,6 +96,10 @@ class TermTextColorizer(IroList):
             if name in self._iro_list:
                 if self._set_iro is "":
                     self._set_iro = name
+
+                # add method to class
+                self.add_iro_method(name)
+
                 return True
 
         return False
@@ -126,6 +147,10 @@ class ANSITextColorizer(IroList):
             if name in self._iro_list:
                 if self._set_iro is "":
                     self._set_iro = name
+
+                # add method to class
+                self.add_iro_method(name)
+
                 return True
 
         return False

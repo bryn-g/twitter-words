@@ -10,21 +10,16 @@ import ssl
 import time
 
 import twitter_helper
-import text_colorizer
 
 class FeedListener(tweepy.streaming.StreamListener):
     # tweet padding and line widths in chars
     PADDING_WIDTH = 21
     LINE_WIDTH = 90
 
-    # terminal color assignment
-    term = text_colorizer.TermTextColorizer()
-    term.add_iro("orange", "172")
-    term.add_iro("gold", "220")
-    term.add_iro("green", "112")
-    term.add_iro("purple", "140")
-    term.add_iro("gray", "246")
-    term.add_iro("plum", "96")
+    term = twitter_helper.TextColorSet()
+
+    def __init__(self):
+        super().__init__()
 
     @classmethod
     def handle_urls(cls, urls, text, count, tag="URL"):
@@ -33,7 +28,7 @@ class FeedListener(tweepy.streaming.StreamListener):
             twitter_url = url['url']
             expanded_url = url['expanded_url']
             url_tag = f"[{tag}#{count}]"
-            color_tag = f"{cls.term.iro(url_tag, 'gray')}"
+            color_tag = f"{cls.term.gray(url_tag)}"
             text = text.replace(twitter_url, color_tag)
             url_list.append(f"[{count}]{expanded_url}")
             count += 1
@@ -66,7 +61,7 @@ class FeedListener(tweepy.streaming.StreamListener):
 
                     for hashtag in status.extended_tweet['entities']['hashtags']:
                         tag = f"#{hashtag['text']}"
-                        color_tag = f"{self.term.iro(tag, 'orange')}"
+                        color_tag = f"{self.term.orange(tag)}"
                         text = text.replace(tag, color_tag)
 
         if hasattr(status, 'entities'):
@@ -80,7 +75,7 @@ class FeedListener(tweepy.streaming.StreamListener):
 
                 for hashtag in status.entities['hashtags']:
                     tag = f"#{hashtag['text']}"
-                    color_tag = f"{self.term.iro(tag, 'orange')}"
+                    color_tag = f"{self.term.orange(tag)}"
                     text = text.replace(tag, color_tag)
 
             if 'media' in status.entities:
@@ -89,11 +84,11 @@ class FeedListener(tweepy.streaming.StreamListener):
 
         text = html.unescape(text)
         text = re.sub('[ ]{2,}', ' ', text)
-        nl = self.term.iro(' • ', 'gray')
+        nl = self.term.gray(' • ')
         text = re.sub('[\n]{1,}', nl, text)
 
         # color twitter names in tweet
-        text = re.sub(twitter_helper.TwitterHelper.TWEET_SCREEN_NAME_PATTERN, self.term.iro(r'\1', 'gold'), text)
+        text = re.sub(twitter_helper.TwitterHelper.TWEET_SCREEN_NAME_PATTERN, self.term.gold(r'\1'), text)
 
         quote_status = ""
         if hasattr(status, 'is_quote_status'):
@@ -105,10 +100,10 @@ class FeedListener(tweepy.streaming.StreamListener):
             if 'entities' in status.quoted_status:
                 if 'user_mentions' in status.quoted_status['entities']:
                     for user in status.quoted_status['entities']['user_mentions']:
-                        quote_mentions += f" {self.term.iro('@' + user['screen_name'], 'plum')}"
+                        quote_mentions += f" {self.term.plum('@' + user['screen_name'])}"
 
-        header_string = f"[{self.term.iro(status.created_at, 'green')}]" + \
-                        f"[{self.term.iro('@' + status.user.screen_name, 'purple')}] {quote_status}{quote_mentions}"
+        header_string = f"[{self.term.green(status.created_at)}]" + \
+                        f"[{self.term.purple('@' + status.user.screen_name)}] {quote_status}{quote_mentions}"
 
         tweet_string = f"{text}"
         tweet_string = f"{textwrap.dedent(tweet_string).strip()}"
@@ -122,16 +117,16 @@ class FeedListener(tweepy.streaming.StreamListener):
             urls = twitter_helper.insert_newlines(tweet_url_list, self.LINE_WIDTH, padding_count=self.PADDING_WIDTH,
                                                   padding_first_line=True, newline_to_spaces=False)
 
-            color_urls = f"{self.term.iro(urls, 'gray')}"
+            color_urls = f"{self.term.gray(urls)}"
             print(f"{color_urls}")
 
         print()
 
     def on_error(self, status):
         if status == 420:
-            print(f"Stream is limited.")
+            print(f"{term.darkcyan('Stream is limited.')}")
         else:
-            print(f"Stream error: {status}")
+            print(f"{term.darkcyan('Stream error: ' + status)}")
 
         return False
 
@@ -143,8 +138,7 @@ def get_arguments():
     return args
 
 def main():
-    term = text_colorizer.TermTextColorizer()
-    term.add_iro("blue", "38")
+    term = twitter_helper.TextColorSet()
 
     twitter_api_keys = twitter_helper.get_twitter_env_api_keys()
     tweepy_auth = twitter_helper.get_tweepy_auth_handler(twitter_api_keys)
@@ -157,14 +151,14 @@ def main():
     try:
         twitter_stream.filter(track=keyword_list, async=False)
     except ssl.SSLError:
-        print(f"\n{term.iro('Connection timeout. Stopping twitter feed.', 'blue')}")
+        print(f"\n{term.darkcyan('Connection timeout. Stopping twitter feed.')}")
         twitter_stream.disconnect()
     except:
-        print(f"\n{term.iro('Error. Stopping twitter feed.', 'blue')}")
+        print(f"\n{term.darkcyan('Error. Stopping twitter feed.')}")
         try:
             twitter_stream.disconnect()
         except:
-            print(f"{term.iro('Stream disconnect error.', 'blue')}")
+            print(f"{term.darkcyan('Stream disconnect error.')}")
 
 if __name__ == '__main__':
     main()

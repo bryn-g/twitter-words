@@ -4,6 +4,19 @@ import argparse
 import json
 import tweepy
 
+import text_colorizer
+
+class TextColorSet(text_colorizer.TermTextColorizer):
+    def __init__(self):
+        super().__init__()
+        self.add_iro("orange", "172")
+        self.add_iro("gold", "220")
+        self.add_iro("green", "112")
+        self.add_iro("purple", "140")
+        self.add_iro("gray", "246")
+        self.add_iro("plum", "96")
+        self.add_iro("darkcyan", "38")
+
 class TwitterHelper(object):
     SCREEN_NAME_PATTERN = re.compile(r'^@?[A-Za-z0-9_]{1,15}$', re.UNICODE)
     TWEET_SCREEN_NAME_PATTERN = re.compile(r'(@[A-Za-z0-9_]{1,15})', re.DOTALL)
