@@ -16,6 +16,9 @@ class TextColorSet(text_colorizer.TermTextColorizer):
         self.add_iro("gray", "246")
         self.add_iro("plum", "96")
         self.add_iro("darkcyan", "38")
+        self.add_iro("bg_green", "112", True)
+        self.add_iro("bg_plum", "96", True)
+        self.add_iro("bg_gray", "246", True)
 
 class TwitterHelper(object):
     SCREEN_NAME_PATTERN = re.compile(r'^@?[A-Za-z0-9_]{1,15}$', re.UNICODE)
