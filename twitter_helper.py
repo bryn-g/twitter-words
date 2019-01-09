@@ -89,7 +89,7 @@ def insert_newlines(input_text, line_length, padding_count=0, padding_first_line
             output_string += '\n'
             output_string += '\n'.join(cut_lines(line, line_length))
 
-    elif type(input_string) is str:
+    elif type(input_text) is str:
         input_string = input_text
 
         if newline_to_spaces:

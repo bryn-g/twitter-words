@@ -137,7 +137,7 @@ class FeedListener(tweepy.streaming.StreamListener):
 
 def get_arguments():
     parser = argparse.ArgumentParser()
-    parser.add_argument('-k', '--keyword', help="track tweets", type=str, required=True)
+    parser.add_argument('-k', '--keywords', help="track tweets with keywords (comma seperated).", type=str, required=True)
     args = parser.parse_args()
 
     return args
@@ -151,7 +151,7 @@ def main():
     tweepy_auth = twitter_helper.get_tweepy_auth_handler(twitter_api_keys)
 
     user_args = get_arguments()
-    keyword_list = user_args.keyword.split(',')
+    keyword_list = user_args.keywords.split(',')
 
     twitter_stream = tweepy.Stream(tweepy_auth, FeedListener())
 
